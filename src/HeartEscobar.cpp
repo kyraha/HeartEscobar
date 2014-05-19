@@ -10,6 +10,7 @@
 #define BOOST_FILESYSTEM_NO_DEPRECATED
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
 #include <libexif/exif-data.h>
 
 using namespace std;
@@ -22,6 +23,10 @@ public:
 	string getIdFromExif();
 	string id;
 	directory_entry mPath;
+	string mModel;
+	string mTaken;
+	string mTakenSub;
+	int mX, mY;
 	friend std::ostream& operator<<(std::ostream& stream, const PhotoFile& photo);
 };
 
@@ -32,27 +37,55 @@ std::ostream& operator<<(std::ostream& stream, const PhotoFile& photo)
 }
 
 PhotoFile::PhotoFile(directory_entry& p)
-: mPath(p)
+: mPath(p), mX(0), mY(0)
 {
 	id = getIdFromExif();
 }
 
 string PhotoFile::getIdFromExif()
 {
-	string ret("");
 	ExifData *exif_data = exif_data_new_from_file(mPath.path().c_str());
 	if(!exif_data) return "";
 
-	ExifEntry *entry = exif_content_get_entry(exif_data->ifd[EXIF_IFD_0], EXIF_TAG_MODEL);
-    if (entry && entry->format==2) {
-    	ret += (const char*)entry->data;
-   		trim(ret);
+	ExifEntry *entry;
+
+	entry = exif_content_get_entry(exif_data->ifd[EXIF_IFD_0], EXIF_TAG_MODEL);
+    if (entry && entry->format==EXIF_FORMAT_ASCII) {
+		mModel = (const char*)entry->data;
+		trim(mModel);
+		exif_entry_unref(entry);
     }
-    else {
-    	ret += "UNKNOWN";
-    }
-	ret += "|";
-	return ret;
+
+   	entry = exif_content_get_entry(exif_data->ifd[EXIF_IFD_EXIF], EXIF_TAG_DATE_TIME_ORIGINAL);
+   	if(entry && entry->format==EXIF_FORMAT_ASCII) {
+		mTaken = (const char*)entry->data;
+		trim(mTaken);
+		exif_entry_unref(entry);
+   	}
+
+   	entry = exif_content_get_entry(exif_data->ifd[EXIF_IFD_EXIF], EXIF_TAG_SUB_SEC_TIME_ORIGINAL);
+   	if(entry && entry->format==EXIF_FORMAT_ASCII) {
+   		cout<<"Format="<<entry->format<<endl;
+   		mTakenSub = (const char*)entry->data;
+   		trim(mTakenSub);
+   		exif_entry_unref(entry);
+   	}
+
+   	entry = exif_content_get_entry(exif_data->ifd[EXIF_IFD_EXIF], EXIF_TAG_PIXEL_X_DIMENSION);
+   	if(entry && entry->format==EXIF_FORMAT_LONG) {
+		mX = exif_get_long(entry->data,exif_data_get_byte_order (exif_data));
+		exif_entry_unref(entry);
+   	}
+
+   	entry = exif_content_get_entry(exif_data->ifd[EXIF_IFD_EXIF], EXIF_TAG_PIXEL_Y_DIMENSION);
+   	if(entry || entry->format==EXIF_FORMAT_LONG) {
+		mY = exif_get_long(entry->data,exif_data_get_byte_order (exif_data));
+		exif_entry_unref(entry);
+   	}
+
+	return mModel+"|"+mTaken+"|"+(mTakenSub.empty()?"00":mTakenSub)+"|"
+			+boost::lexical_cast<std::string>(mX)+"x"
+			+boost::lexical_cast<std::string>(mY);
 }
 
 int main(int argc, char* argv[]) {
