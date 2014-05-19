@@ -21,6 +21,18 @@ class PhotoFile {
 public:
 	PhotoFile(directory_entry& p);
 	string getIdFromExif();
+	int getIntEntry(ExifEntry* entry, ExifData* exif_data) {
+   		switch(entry->format) {
+   		case EXIF_FORMAT_LONG:
+   			return exif_get_long(entry->data,exif_data_get_byte_order (exif_data));
+   			break;
+   		case EXIF_FORMAT_SHORT:
+   			return exif_get_short(entry->data,exif_data_get_byte_order (exif_data));
+   			break;
+   		default:
+   			return 0;
+   		}
+	}
 	string id;
 	directory_entry mPath;
 	string mModel;
@@ -65,23 +77,24 @@ string PhotoFile::getIdFromExif()
 
    	entry = exif_content_get_entry(exif_data->ifd[EXIF_IFD_EXIF], EXIF_TAG_SUB_SEC_TIME_ORIGINAL);
    	if(entry && entry->format==EXIF_FORMAT_ASCII) {
-   		cout<<"Format="<<entry->format<<endl;
    		mTakenSub = (const char*)entry->data;
    		trim(mTakenSub);
    		exif_entry_unref(entry);
    	}
 
    	entry = exif_content_get_entry(exif_data->ifd[EXIF_IFD_EXIF], EXIF_TAG_PIXEL_X_DIMENSION);
-   	if(entry && entry->format==EXIF_FORMAT_LONG) {
-		mX = exif_get_long(entry->data,exif_data_get_byte_order (exif_data));
+   	if(entry) {
+   		mX = getIntEntry(entry,exif_data);
 		exif_entry_unref(entry);
    	}
 
    	entry = exif_content_get_entry(exif_data->ifd[EXIF_IFD_EXIF], EXIF_TAG_PIXEL_Y_DIMENSION);
-   	if(entry || entry->format==EXIF_FORMAT_LONG) {
-		mY = exif_get_long(entry->data,exif_data_get_byte_order (exif_data));
-		exif_entry_unref(entry);
+   	if(entry) {
+   		mY = getIntEntry(entry,exif_data);
+   		exif_entry_unref(entry);
    	}
+
+   	if(mModel.empty()) return "";
 
 	return mModel+"|"+mTaken+"|"+(mTakenSub.empty()?"00":mTakenSub)+"|"
 			+boost::lexical_cast<std::string>(mX)+"x"
