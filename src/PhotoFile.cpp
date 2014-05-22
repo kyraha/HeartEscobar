@@ -6,10 +6,10 @@
  */
 
 #include "PhotoFile.hpp"
+#include <boost/lexical_cast.hpp>
+#include <boost/algorithm/string.hpp>
 
 using namespace std;
-using namespace boost::filesystem;
-using namespace boost::algorithm;
 
 std::ostream& operator<<(std::ostream& stream, const PhotoFile& photo)
 {
@@ -17,51 +17,69 @@ std::ostream& operator<<(std::ostream& stream, const PhotoFile& photo)
 	return stream;
 }
 
-PhotoFile::PhotoFile(directory_entry& p)
+PhotoFile::PhotoFile(boost::filesystem::directory_entry& p)
 : mPath(p), mX(0), mY(0)
 {
-	id = getIdFromExif();
+	mpExif = exif_data_new_from_file(p.path().c_str());
+	if(mpExif) id = getIdFromExif();
+}
+
+PhotoFile::~PhotoFile() {
+	if(mpExif) exif_data_unref(mpExif);
+}
+
+
+long PhotoFile::exif_fetch_long(ExifTag tag, ExifIfd ifd) {
+	int ifd_end = ifd;
+	int ifd_i = 0;
+	if(ifd < EXIF_IFD_COUNT) { ifd_i = ifd; ifd_end = ifd+1; }
+	for(; ifd_i < ifd_end; ++ifd_i) {
+		ExifEntry* entry = exif_content_get_entry(mpExif->ifd[ifd_i], tag);
+		/*! Return the #ExifEntry in this IFD corresponding to the given tag.
+		 * This is a pointer into a member of the #ExifContent array and must NOT be
+		 * freed or unrefed by the caller. */
+		if(!entry) continue;
+
+		switch(entry->format) {
+		case EXIF_FORMAT_LONG:
+			return exif_get_long(entry->data, exif_data_get_byte_order(mpExif));
+		case EXIF_FORMAT_SHORT:
+			return exif_get_short(entry->data, exif_data_get_byte_order(mpExif));
+		default:
+			continue;
+		}
+	}
+	return 0;
+}
+
+std::string PhotoFile::exif_fetch_string(ExifTag tag, ExifIfd ifd) {
+	std::string ret;
+	int ifd_end = ifd;
+	int ifd_i = 0;
+	if(ifd<EXIF_IFD_COUNT) { ifd_i = ifd; ifd_end = ifd+1; }
+	for(; ifd_i < ifd_end; ++ifd_i) {
+		ExifEntry* entry = exif_content_get_entry(mpExif->ifd[ifd_i], tag);
+		if(!entry) continue;
+
+		switch(entry->format) {
+		case EXIF_FORMAT_ASCII:
+			ret = (const char*)entry->data;
+			boost::algorithm::trim(ret);
+			return ret;
+		default:
+			continue;
+		}
+	}
+	return "";
 }
 
 string PhotoFile::getIdFromExif()
 {
-	ExifData *exif_data = exif_data_new_from_file(mPath.path().c_str());
-	if(!exif_data) return "";
-
-	ExifEntry *entry;
-
-	entry = exif_content_get_entry(exif_data->ifd[EXIF_IFD_0], EXIF_TAG_MODEL);
-    if (entry && entry->format==EXIF_FORMAT_ASCII) {
-		mModel = (const char*)entry->data;
-		trim(mModel);
-		exif_entry_unref(entry);
-    }
-
-   	entry = exif_content_get_entry(exif_data->ifd[EXIF_IFD_EXIF], EXIF_TAG_DATE_TIME_ORIGINAL);
-   	if(entry && entry->format==EXIF_FORMAT_ASCII) {
-		mTaken = (const char*)entry->data;
-		trim(mTaken);
-		exif_entry_unref(entry);
-   	}
-
-   	entry = exif_content_get_entry(exif_data->ifd[EXIF_IFD_EXIF], EXIF_TAG_SUB_SEC_TIME_ORIGINAL);
-   	if(entry && entry->format==EXIF_FORMAT_ASCII) {
-   		mTakenSub = (const char*)entry->data;
-   		trim(mTakenSub);
-   		exif_entry_unref(entry);
-   	}
-
-   	entry = exif_content_get_entry(exif_data->ifd[EXIF_IFD_EXIF], EXIF_TAG_PIXEL_X_DIMENSION);
-   	if(entry) {
-   		mX = getIntEntry(entry,exif_data);
-		exif_entry_unref(entry);
-   	}
-
-   	entry = exif_content_get_entry(exif_data->ifd[EXIF_IFD_EXIF], EXIF_TAG_PIXEL_Y_DIMENSION);
-   	if(entry) {
-   		mY = getIntEntry(entry,exif_data);
-   		exif_entry_unref(entry);
-   	}
+	mModel = exif_fetch_string(EXIF_TAG_MODEL);
+	mTaken = exif_fetch_string(EXIF_TAG_DATE_TIME_ORIGINAL, EXIF_IFD_EXIF);
+	mTakenSub = exif_fetch_string(EXIF_TAG_SUB_SEC_TIME_ORIGINAL, EXIF_IFD_EXIF);
+	mX = exif_fetch_long(EXIF_TAG_PIXEL_X_DIMENSION,EXIF_IFD_EXIF);
+	mY = exif_fetch_long(EXIF_TAG_PIXEL_Y_DIMENSION,EXIF_IFD_EXIF);
 
    	if(mModel.empty()) return "";
 

@@ -11,35 +11,22 @@
 #include <iostream>
 #define BOOST_FILESYSTEM_NO_DEPRECATED
 #include <boost/filesystem.hpp>
-#include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
 #include <libexif/exif-data.h>
-
-using namespace std;
-using namespace boost::filesystem;
-using namespace boost::algorithm;
 
 class PhotoFile {
 public:
-	PhotoFile(directory_entry& p);
-	string getIdFromExif();
-	int getIntEntry(ExifEntry* entry, ExifData* exif_data) {
-   		switch(entry->format) {
-   		case EXIF_FORMAT_LONG:
-   			return exif_get_long(entry->data,exif_data_get_byte_order (exif_data));
-   			break;
-   		case EXIF_FORMAT_SHORT:
-   			return exif_get_short(entry->data,exif_data_get_byte_order (exif_data));
-   			break;
-   		default:
-   			return 0;
-   		}
-	}
-	string id;
-	directory_entry mPath;
-	string mModel;
-	string mTaken;
-	string mTakenSub;
+	PhotoFile(boost::filesystem::directory_entry& p);
+	~PhotoFile();
+	std::string getIdFromExif();
+	long exif_fetch_long(ExifTag tag, ExifIfd ifd=EXIF_IFD_COUNT);
+	std::string exif_fetch_string(ExifTag tag, ExifIfd ifd=EXIF_IFD_COUNT);
+
+	std::string id;
+	ExifData* mpExif;
+	boost::filesystem::directory_entry mPath;
+	std::string mModel;
+	std::string mTaken;
+	std::string mTakenSub;
 	int mX, mY;
 	friend std::ostream& operator<<(std::ostream& stream, const PhotoFile& photo);
 };

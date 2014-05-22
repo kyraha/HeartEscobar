@@ -8,6 +8,7 @@
 
 #include <iostream>
 #include "PhotoFile.hpp"
+using namespace std;
 
 int main(int argc, char* argv[]) {
 	if (argc < 2) {
@@ -15,14 +16,14 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
-	path p (argv[1]);
+	boost::filesystem::path p (argv[1]);
 
-	if (exists(p)) {
+	if (boost::filesystem::exists(p)) {
 		try {
-			for(recursive_directory_iterator pPath(p);
-					pPath != recursive_directory_iterator();
+			for(boost::filesystem::recursive_directory_iterator pPath(p);
+					pPath != boost::filesystem::recursive_directory_iterator();
 					++pPath) {
-				if(is_regular_file(*pPath)) {
+				if(boost::filesystem::is_regular_file(*pPath)) {
 					PhotoFile thePhoto(*pPath);
 					if(!thePhoto.id.empty()) {
 						//cout << *pPath << "---";
@@ -31,9 +32,9 @@ int main(int argc, char* argv[]) {
 					}
 				}
 			}
-			cout << "All good!" << endl;
+			cerr << "All good!" << endl;
 		}
-		catch (const filesystem_error& ex) {
+		catch (const boost::filesystem::filesystem_error& ex) {
 			cerr << ex.what() << endl;
 		}
 	}
