@@ -24,6 +24,7 @@ public:
 	std::string id;
 	ExifData* mpExif;
 	boost::filesystem::directory_entry mPath;
+	unsigned long mFileSize;
 	std::string mModel;
 	std::string mTaken;
 	std::string mTakenSub;

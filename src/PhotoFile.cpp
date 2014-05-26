@@ -13,7 +13,7 @@ using namespace std;
 
 std::ostream& operator<<(std::ostream& stream, const PhotoFile& photo)
 {
-	stream << "\"" << photo.id << "\" : " << photo.mPath;
+	stream << "[" << photo.id << "] " << photo.mFileSize << " " << photo.mPath;
 	return stream;
 }
 
@@ -21,7 +21,10 @@ PhotoFile::PhotoFile(boost::filesystem::directory_entry& p)
 : mPath(p), mX(0), mY(0)
 {
 	mpExif = exif_data_new_from_file(p.path().c_str());
-	if(mpExif) id = getIdFromExif();
+	if(mpExif) {
+		id = getIdFromExif();
+		mFileSize = boost::filesystem::file_size(p);
+	}
 }
 
 PhotoFile::~PhotoFile() {
